@@ -1,0 +1,123 @@
+# syntax=docker/dockerfile:1
+
+# --- Global Arguments ---
+ARG UBUNTU_VERSION=22.04
+
+# --- ROCm Builder Stage ---
+FROM ubuntu:${UBUNTU_VERSION} AS rocm-builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    cmake \
+    ninja-build \
+    git \
+    python3 \
+    python3-pip \
+    python3-venv \
+    build-essential \
+    pkg-config \
+    libnuma-dev \
+    libpci-dev \
+    libgl1-mesa-dev \
+    libglu1-mesa-dev \
+    python3-dev \
+    vim-common \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Clone TheRock (ROCm 7.11)
+RUN git clone --depth 1 --branch therock-7.11 https://github.com/ROCm/TheRock.git .
+
+# Apply patches from ChristophBellmann/rocm-7.11-gfx103x
+# We clone it separately and apply the 5 required patches
+RUN git clone https://github.com/ChristophBellmann/rocm-7.11-gfx103x.git /tmp/patches && \
+    cd compiler/llvm-project && \
+    git apply /tmp/patches/0001-Ensure-to-use-libamdhip64-with-major-version.patch && \
+    git apply /tmp/patches/0002-hipcc-fix-default-include-path.patch && \
+    git apply /tmp/patches/0003-HACK-Handle-ROCM-installation-layout.patch && \
+    cd ../../core/rocm-systems && \
+    git apply /tmp/patches/0002-Revert-hsakmt-bump-vgpr-count-for-gfx1151.patch && \
+    git apply /tmp/patches/0003-Use-is_versioned-true-consistently.patch && \
+    rm -rf /tmp/patches
+
+# Fix ROCM_PATH in therock_subproject.cmake as noted in docs
+RUN sed -i '/--unset=ROCM_PATH/a \    list(APPEND _build_env_pairs "ROCM_PATH=/opt/rocm")' cmake/therock_subproject.cmake
+
+# Configure and build ROCm (Minimal for llama.cpp)
+# We target gfx1031 (RX 6700 XT)
+RUN cmake -B build -GNinja . \
+    -DTHEROCK_AMDGPU_TARGETS=gfx1031 \
+    -DTHEROCK_ENABLE_COMPILER=ON \
+    -DTHEROCK_ENABLE_CORE_RUNTIME=ON \
+    -DTHEROCK_ENABLE_HIP_RUNTIME=ON \
+    -DTHEROCK_ENABLE_ALL=OFF \
+    -DCMAKE_INSTALL_PREFIX=/opt/rocm
+
+RUN cmake --build build --target install
+
+# --- llama.cpp Builder Stage ---
+FROM ubuntu:${UBUNTU_VERSION} AS llama-builder
+
+# Install llama.cpp dependencies
+RUN apt-get update && apt-get install -y \
+    cmake \
+    build-essential \
+    git \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy built ROCm from previous stage
+COPY --from=rocm-builder /opt/rocm /opt/rocm
+
+WORKDIR /app
+
+# Clone llama.cpp
+RUN git clone --depth 1 https://github.com/ggerganov/llama.cpp.git .
+
+# Build llama.cpp with ROCm (HIP)
+ENV ROCM_PATH=/opt/rocm
+RUN cmake -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DGGML_HIP=ON \
+    -DAMDGPU_TARGETS=gfx1031 \
+    -DLLAMA_BUILD_SERVER=ON \
+    -DCMAKE_PREFIX_PATH=/opt/rocm \
+    -DGGML_ROCM=ON . \
+    && cmake --build build --config Release -j$(nproc)
+
+# Prepare runtime artifacts
+RUN mkdir -p /app/runtime && \
+    cp build/bin/llama-server /app/runtime/ && \
+    cp build/bin/llama-cli /app/runtime/ && \
+    find build -name "*.so*" -exec cp -P {} /app/runtime/ \;
+
+# --- Final Runtime Stage ---
+FROM ubuntu:${UBUNTU_VERSION} AS runtime
+
+RUN apt-get update && apt-get install -y \
+    libstdc++6 \
+    libgomp1 \
+    libnuma1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy built ROCm and llama.cpp
+COPY --from=rocm-builder /opt/rocm /opt/rocm
+COPY --from=llama-builder /app/runtime/ /usr/local/bin/
+COPY --from=llama-builder /app/runtime/*.so* /usr/local/lib/
+
+# Set ROCm environment variables
+ENV HIP_PLATFORM=rocm \
+    ROCM_PATH=/opt/rocm \
+    LD_LIBRARY_PATH=/usr/local/lib:/opt/rocm/lib:$LD_LIBRARY_PATH \
+    HSA_OVERRIDE_GFX_VERSION=10.3.0 \
+    HSA_ENABLE_SDMA=0
+
+RUN ldconfig
+
+ENTRYPOINT ["/usr/local/bin/llama-server"]
+CMD ["-m", "/models/model.gguf", "--host", "0.0.0.0", "--port", "8080"]

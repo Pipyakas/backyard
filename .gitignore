@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+env/
+.venv/
+
+# Node
+node_modules/
+src/frontend/node_modules/
+src/backend/node_modules/
+*.lock
+package-lock.json
+src/frontend/package-lock.json
+
+# TypeScript
+src/frontend/src/
+src/frontend/tsconfig.json
+src/frontend/tsconfig.node.json
+src/frontend/vite.config.ts
+src/backend/dist/
+
+# Benchmark results
+benchmarks/*.json
+benchmarks/*.csv
+benchmarks/*.db-shm
+benchmarks/*.db-wal
+!benchmarks/backyard.db
+# Models (never commit binary model files)
+models/
+
+# Databases (in data folder)
+data/db/*.db-shm
+data/db/*.db-wal
+
+# Old root location (deprecated)
+backyard.db
+backyard.db-shm
+backyard.db-wal
+results.db
+results.db-shm
+results.db-wal
+logs/benchmark/*.json
+logs/benchmark/*.csv
+
+# Runtime state
+src/backyard_users.json
+backyard_sessions.json
+src/backyard_users.json
+*.session
+
+# Caddy
+Caddyfile
+
+# Build workdir (large external build artifacts)
+build_workdir/
+
+# Docs - commented out to allow ROCm docs
+# ROCm_*.md
+# docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+tmp/
+
+# Secrets (NEVER commit)
+.env
+.env.*
+secrets/
+credentials*
+*.pem
+*.key
+id_rsa*
+*.sqlite
+*.db
+api_key*
+BACKYARD_ADMIN_API_KEY
+BACKYARD_VIEWER_API_KEY

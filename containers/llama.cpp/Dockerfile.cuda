@@ -1,0 +1,108 @@
+# syntax=docker/dockerfile:1
+
+# --- Global Arguments ---
+ARG UBUNTU_VERSION=24.04
+ARG CUDA_VERSION=12.8.0
+
+# --- Builder Stage ---
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS builder
+
+LABEL backyard.built="true"
+LABEL backyard.engine="llama.cpp"
+
+RUN apt-get update && apt-get install -y \
+    cmake \
+    build-essential \
+    git \
+    libvulkan-dev \
+    vulkan-tools \
+    glslc \
+    python3-pip \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Clone llama.cpp directly
+RUN git clone --depth 1 https://github.com/ggerganov/llama.cpp.git .
+
+# Build with all backends enabled and Dynamic Loading (DL)
+# GGML_BACKEND_DL=ON allows the server to load the appropriate .so at runtime
+# GGML_CPU_ALL_VARIANTS=ON allows runtime detection of AVX/AVX2/AVX512
+RUN cmake -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DGGML_NATIVE=OFF \
+    -DGGML_BACKEND_DL=ON \
+    -DGGML_CPU_ALL_VARIANTS=ON \
+    -DGGML_CUDA=ON \
+    -DGGML_VULKAN=ON \
+    -DLLAMA_BUILD_SERVER=ON \
+    -DLLAMA_BUILD_TESTS=OFF \
+    -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" . \
+    && cmake --build build --config Release -j$(nproc)
+
+# Prepare runtime artifacts
+RUN mkdir -p /app/runtime && \
+    cp build/bin/llama-server /app/runtime/ && \
+    cp build/bin/llama-cli /app/runtime/ && \
+    cp build/bin/llama-bench /app/runtime/ && \
+    find build -name "*.so*" -exec cp -P {} /app/runtime/ \;
+
+# --- Runtime Base ---
+FROM ubuntu:${UBUNTU_VERSION} AS runtime-base
+
+RUN apt-get update && apt-get install -y \
+    libstdc++6 \
+    libgomp1 \
+    libvulkan1 \
+    mesa-vulkan-drivers \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /app/runtime/ /usr/local/bin/
+COPY --from=builder /app/runtime/*.so* /usr/local/lib/
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+ENTRYPOINT ["/usr/local/bin/llama-server"]
+CMD ["-m", "/models/model.gguf", "--host", "0.0.0.0", "--port", "8080"]
+
+# --- Variant: CPU ---
+FROM runtime-base AS cpu
+RUN echo "cpu" > /variant
+ENV GGML_CUDA_NO_PINNED=1
+
+# --- Variant: CUDA ---
+FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${UBUNTU_VERSION} AS cuda
+RUN echo "cuda" > /variant
+
+RUN apt-get update && apt-get install -y \
+    libstdc++6 \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /app/runtime/ /usr/local/bin/
+COPY --from=builder /app/runtime/*.so* /usr/local/lib/
+# Standard CUDA runtime libs are already in the base image, 
+# but we ensure our custom built libraries take precedence
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+
+ENTRYPOINT ["/usr/local/bin/llama-server"]
+CMD ["-m", "/models/model.gguf", "--host", "0.0.0.0", "--port", "8080"]
+
+# --- Variant: Vulkan (All GPUs) ---
+FROM runtime-base AS vulkan
+RUN echo "vulkan" > /variant
+
+# --- Variant: Vulkan AMD (RADV) ---
+FROM runtime-base AS vulkan-amd
+RUN echo "vulkan-amd" > /variant
+ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
+
+# --- Variant: Vulkan NVIDIA ---
+FROM runtime-base AS vulkan-nvidia
+RUN echo "vulkan-nvidia" > /variant
+# Using NVK (Mesa) by default if available, or point to proprietary if mapped
+ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json

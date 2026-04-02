@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - backyard</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260322" crossorigin="anonymous">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦙</text></svg>">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                </svg>
+                <h1>backyard</h1>
+            </div>
+            
+            <div id="auth-error" class="error-message" style="display: none;"></div>
+            
+            <div id="setup-form-container" style="display: none;">
+                <p>Create your admin account to get started.</p>
+                <form id="setup-form">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="setup-username" placeholder="admin" required minlength="3">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="setup-password" placeholder="••••••••" required minlength="8">
+                    </div>
+                    <button type="submit" class="btn primary" style="width: 100%; margin-top: 16px;">Create Account</button>
+                </form>
+            </div>
+            
+            <div id="login-form-container">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="login-username" placeholder="admin" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="login-password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn primary" style="width: 100%; margin-top: 16px;">Login</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let authMode = 'login';
+        
+        async function checkAuth() {
+            try {
+                const statusRes = await fetch('/api/auth/status');
+                const status = await statusRes.json();
+                
+                if (!status.configured) {
+                    window.location.href = '/';
+                    return;
+                }
+                
+                if (!status.has_users) {
+                    authMode = 'setup';
+                    document.getElementById('setup-form-container').style.display = 'block';
+                    document.getElementById('login-form-container').style.display = 'none';
+                    return;
+                }
+                
+                const meRes = await fetch('/api/auth/me');
+                if (meRes.ok) {
+                    window.location.href = '/';
+                    return;
+                }
+            } catch (e) {
+                console.error('Auth check failed:', e);
+            }
+        }
+        
+        function showError(msg) {
+            const el = document.getElementById('auth-error');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+        
+        function clearError() {
+            document.getElementById('auth-error').style.display = 'none';
+        }
+        
+        async function handleSetup(e) {
+            e.preventDefault();
+            clearError();
+            
+            const username = document.getElementById('setup-username').value.trim();
+            const password = document.getElementById('setup-password').value;
+            
+            try {
+                const res = await fetch('/api/auth/local/setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    // Auto-login after setup
+                    const loginRes = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    const loginData = await loginRes.json();
+                    
+                    if (loginData.success) {
+                        window.location.href = '/';
+                    } else {
+                        showError('Account created! Please login.');
+                        document.getElementById('setup-form-container').style.display = 'none';
+                        document.getElementById('login-form-container').style.display = 'block';
+                        document.getElementById('login-username').value = username;
+                    }
+                } else {
+                    showError(data.error || 'Setup failed');
+                }
+            } catch (e) {
+                showError('Setup error: ' + e.message);
+            }
+        }
+        
+        async function handleLogin(e) {
+            e.preventDefault();
+            clearError();
+            
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    window.location.href = '/';
+                } else {
+                    showError(data.error || 'Login failed');
+                }
+            } catch (e) {
+                showError('Login error: ' + e.message);
+            }
+        }
+        
+        document.getElementById('setup-form').addEventListener('submit', handleSetup);
+        document.getElementById('login-form').addEventListener('submit', handleLogin);
+        
+        checkAuth();
+    </script>
+    
+    <style>
+        .auth-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--bg-primary);
+        }
+        .auth-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+        }
+        .auth-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .auth-logo svg {
+            color: var(--accent);
+        }
+        .auth-logo h1 {
+            margin: 10px 0 0 0;
+            color: var(--accent);
+        }
+        .auth-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+        }
+        .error-message {
+            background: rgba(196, 85, 85, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</body>
+</html>

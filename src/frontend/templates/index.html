@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>backyard - Llama.cpp Launcher</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260322c" crossorigin="anonymous">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦙</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="header-with-tabs">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span class="brand">backyard</span>
+                </div>
+
+                <nav class="tabs">
+                    <a href="/" class="tab active" data-tab="dashboard">Dashboard</a>
+                    <a href="/models" class="tab" data-tab="models">Models</a>
+                    <a href="/servers" class="tab" data-tab="servers">Servers</a>
+                    <a href="/benchmarks" class="tab" data-tab="benchmarks">Benchmarks</a>
+                    <a href="/settings" class="tab" data-tab="settings">Settings</a>
+                </nav>
+
+                <div class="width-toggle-container">
+                    <button id="width-toggle-btn" class="btn ghost width-toggle" onclick="toggleWidth()" title="Toggle full width">
+                        Normal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container main-container">
+        <main>
+            <section id="dashboard" class="tab-content active">
+                <div class="dashboard-grid">
+                    <div class="dashboard-col">
+                        <div class="card">
+                            <h3>Active Servers</h3>
+                            <p id="dashboard-server-count">0 server(s) running</p>
+                            <button onclick="navigateTo('/servers')" class="btn secondary">Manage Servers</button>
+                        </div>
+
+                        <div class="card">
+                            <h3>Downloaded Models</h3>
+                            <div id="dashboard-models">
+                                <p class="loading">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-col">
+                        <div class="card">
+                            <h3>Benchmark Results</h3>
+                            <p>Test performance across backends</p>
+                            <button onclick="navigateTo('/benchmarks')" class="btn secondary">View Benchmarks</button>
+                        </div>
+
+                        <div class="card">
+                            <h3>Installed Backends</h3>
+                            <ul class="backend-list" id="dashboard-backends">
+                                <li class="loading">Loading...</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="notification-container" id="notification-container"></div>
+                </div>
+            </section>
+
+            <section id="models" class="tab-content">
+                <div class="card">
+                    <h3>Search HuggingFace</h3>
+                    <div class="search-box">
+                        <input type="text" id="hf-search" placeholder="Search models (e.g., glm-4, llama, qwen)...">
+                        <button onclick="searchHF()" class="btn primary">Search</button>
+                    </div>
+                    <div id="search-results" class="results-grid"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Active Downloads</h3>
+                    <div id="downloads-list" class="downloads-list">
+                        <div class="empty-state">
+                            <p>No active downloads.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Downloaded Models</h3>
+                    <table class="model-table">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Quantizations</th>
+                                <th>Size</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="models-table-body">
+                            <tr><td colspan="4" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="servers" class="tab-content">
+                <div class="card">
+                    <h3>Server Instances</h3>
+                    <div id="servers-list" class="servers-list">
+                        <div class="empty-state">
+                            <p>No servers running.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="storage" class="tab-content">
+                <div class="card">
+                    <h3>Model Libraries</h3>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Library Path</label>
+                            <input type="text" id="lib-path" placeholder="/home/user/models">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Name</label>
+                            <input type="text" id="lib-name" placeholder="Fast SSD">
+                        </div>
+                        <div class="form-group" style="align-self: flex-end;">
+                            <button onclick="registerLibrary()" class="btn primary">Register Library</button>
+                        </div>
+                    </div>
+                    <div id="libraries-list" class="libraries-list" style="margin-top: 20px;"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Move Models</h3>
+                    <p class="help-text">Relocate models between registered libraries to optimize for speed or storage.</p>
+                    <table class="model-table">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Current Path</th>
+                                <th>Target Library</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="move-models-list"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="benchmarks" class="tab-content">
+                <div class="card">
+                    <h3>Run Benchmark</h3>
+                    <form id="benchmark-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Model <span class="help-icon">?</span></label>
+                                <select name="model" id="bench-model" onchange="updateQuantizationSelect(this, 'bench-quant')"></select>
+                                <div class="tooltip">
+                                    <strong>Model to Benchmark</strong>
+                                    Select which downloaded model to test performance on.
+                                    <div class="effect">Time: Larger models take longer to load and test</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Quantization <span class="help-icon">?</span></label>
+                                <select name="quantization" id="bench-quant">
+                                    <option value="">Default</option>
+                                </select>
+                                <div class="tooltip">
+                                    <strong>Quantization Variant</strong>
+                                    Test a specific quantization. Different quants have different speed/quality tradeoffs.
+                                    <div class="effect">Performance: Q8 > Q6 > Q5 > Q4 > Q3 > Q2</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Backend <span class="help-icon">?</span></label>
+                                <select name="backend_type" id="bench-backend"></select>
+                                <div class="tooltip">
+                                    <strong>Backend Implementation</strong>
+                                    Which llama.cpp fork to use for benchmarking.
+                                    <div class="effect">ik_llama.cpp has additional optimizations</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Vendor Backend <span class="help-icon">?</span></label>
+                                <select name="vendor_backend" id="bench-vendor">
+                                    <option value="auto">Auto</option>
+                                    <option value="cuda">CUDA</option>
+                                    <option value="vulkan">Vulkan</option>
+                                    <option value="cpu">CPU Only</option>
+                                </select>
+                                <div class="tooltip">
+                                    <strong>Hardware Acceleration</strong>
+                                    Which compute API to use for running the model.
+                                    <div class="effect">GPU: CUDA/Vulkan provide significant speedup</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Context Size <span class="help-icon">?</span></label>
+                                <input type="number" name="ctx_size" value="2048">
+                                <div class="tooltip">
+                                    <strong>Context Window</strong>
+                                    How many tokens to process in each forward pass.
+                                    <div class="effect">Higher context uses more memory but tests longer sequences</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>GPU Layers <span class="help-icon">?</span></label>
+                                <input type="number" name="n_gpu_layers" value="0">
+                                <div class="tooltip">
+                                    <strong>GPU Offload</strong>
+                                    Number of model layers to run on GPU (0 = CPU only).
+                                    <div class="effect">More layers = faster but uses more VRAM</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Threads <span class="help-icon">?</span></label>
+                                <input type="number" name="n_threads" value="8">
+                                <div class="tooltip">
+                                    <strong>CPU Threads</strong>
+                                    Number of CPU threads for parallel processing.
+                                    <div class="effect">Optimal: Physical CPU cores (don't exceed)</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Prompt Tokens <span class="help-icon">?</span></label>
+                                <input type="number" name="prompt_tokens" value="32">
+                                <div class="tooltip">
+                                    <strong>Prompt Tokens</strong>
+                                    Input tokens for the benchmark prompt.
+                                    <div class="effect">Standard: 32-128 tokens</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Generated Tokens <span class="help-icon">?</span></label>
+                                <input type="number" name="generated_tokens" value="128">
+                                <div class="tooltip">
+                                    <strong>Generation Length</strong>
+                                    Number of tokens to generate during benchmark.
+                                    <div class="effect">Longer generation = more accurate speed measurement</div>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn primary">Run Benchmark</button>
+                        <button type="button" onclick="runComparison()" class="btn secondary">Compare All Backends</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <div class="section-header">
+                        <h3>Context Scaling Analysis</h3>
+                        <div class="view-switcher">
+                            <button onclick="runFindMaxCtx()" class="btn small primary" style="margin-right: 10px;">Find Max Context</button>
+                            <button onclick="runCtxScaling()" class="btn small" style="margin-right: 10px;">Context Scaling Bench</button>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Analysis Result <span class="help-icon">?</span></label>
+                            <select id="scaling-result-select" onchange="renderScalingChart()">
+                                <option value="">Select a scaling benchmark result...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="width: 100%; height: 300px; margin-top: 20px;">
+                        <canvas id="scaling-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="section-header">
+                        <h3>Benchmark Results</h3>
+                        <div class="view-switcher">
+                            <button class="view-btn active" id="view-grid" title="Grid View">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="14" width="7" height="7"></rect>
+                                    <rect x="3" y="14" width="7" height="7"></rect>
+                                </svg>
+                            </button>
+                            <button class="view-btn" id="view-list" title="List View">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="benchmark-results" class="results-grid">
+                        <p class="loading">Loading...</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="settings" class="tab-content">
+                <div class="card">
+                    <h3>Engines</h3>
+                    <div id="engines-list" class="engines-list">
+                        <p class="loading">Loading engines...</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>System & Database</h3>
+                    <div id="system-status-card" class="status-grid">
+                        <div class="status-row"><span>Database</span><span id="db-connected">Checking...</span></div>
+                        <div class="status-row"><span>Path</span><span id="db-path" class="mono">-</span></div>
+                        <div class="status-row"><span>Downloads</span><span id="db-download-count">0</span></div>
+                        <div class="status-row"><span>Benchmarks</span><span id="db-benchmark-count">0</span></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Server Configuration</h3>
+                    <form id="settings-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Default Context Size</label>
+                                <input type="number" name="default_ctx_size" value="4096">
+                            </div>
+                            <div class="form-group">
+                                <label>Default Threads</label>
+                                <input type="number" name="default_threads" value="8">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Default GPU Layers</label>
+                                <input type="number" name="default_gpu_layers" value="999">
+                            </div>
+                            <div class="form-group">
+                                <label>Default Batch Size</label>
+                                <input type="number" name="default_batch_size" value="512">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group checkbox">
+                                <input type="checkbox" name="use_mlock" id="use-mlock" checked>
+                                <label for="use-mlock">Use mlock</label>
+                            </div>
+                            <div class="form-group checkbox">
+                                <input type="checkbox" name="use_mmap" id="use-mmap" checked>
+                                <label for="use-mmap">Use mmap</label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn primary">Save Settings</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>Advanced Options</h3>
+                    <form id="advanced-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tensor Split (comma-separated)</label>
+                                <input type="text" name="tensor_split" placeholder="0.5,0.5 for dual GPU">
+                            </div>
+                            <div class="form-group">
+                                <label>Primary GPU Index</label>
+                                <input type="number" name="primary_gpu" value="0">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Temperature</label>
+                                <input type="range" name="temperature" min="0" max="2" step="0.1" value="0.7">
+                                <span class="value-display">0.7</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Top-K</label>
+                                <input type="number" name="top_k" value="40">
+                            </div>
+                            <div class="form-group">
+                                <label>Top-P</label>
+                                <input type="number" name="top_p" value="0.95" step="0.01" max="1">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>Account</h3>
+                    <button onclick="logout()" class="btn danger">Logout</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="download-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('download-modal')">&times;</span>
+            <h3>Download Model</h3>
+            <p id="modal-model-id"></p>
+            <div id="modal-files"></div>
+            <button onclick="downloadSelected()" class="btn primary">Download Selected</button>
+        </div>
+    </div>
+
+    <div id="dialog-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="dialog-title">Confirm Action</h3>
+            <p id="dialog-message"></p>
+            <div id="dialog-input-container" style="display: none; margin-top: 16px;">
+                <input type="text" id="dialog-input" style="width: 100%;">
+            </div>
+            <div class="modal-actions">
+                <button id="dialog-cancel" class="btn secondary">Cancel</button>
+                <button id="dialog-confirm" class="btn primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="stress-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('stress-modal')">&times;</span>
+            <h3>Start Stress Test</h3>
+            <p>Configure continuous token generation to stress test the server performance.</p>
+            <form id="stress-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Prompt <span class="help-icon">?</span></label>
+                        <textarea name="prompt" id="stress-prompt" rows="3" placeholder="Enter a prompt for continuous generation...">Write a detailed analysis of artificial intelligence and its impact on society.</textarea>
+                        <div class="tooltip">
+                            <strong>Generation Prompt</strong>
+                            The text that will be sent repeatedly to generate tokens.
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Max Tokens <span class="help-icon">?</span></label>
+                        <input type="number" name="max_tokens" id="stress-max-tokens" value="100" min="10" max="1000">
+                        <div class="tooltip">
+                            <strong>Tokens per Request</strong>
+                            Number of tokens to generate per API request.
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Delay (seconds) <span class="help-icon">?</span></label>
+                        <input type="number" name="delay" id="stress-delay" value="1" min="0" max="10" step="0.1">
+                        <div class="tooltip">
+                            <strong>Request Delay</strong>
+                            Seconds to wait between API requests.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeModal('stress-modal')" class="btn secondary">Cancel</button>
+                    <button type="submit" class="btn primary">Start Stress Test</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=20260322c"></script>
+</body>
+</html>
