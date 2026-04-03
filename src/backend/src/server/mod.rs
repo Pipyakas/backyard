@@ -25,9 +25,16 @@ pub async fn start_server(app_state: Arc<AppState>) -> Result<()> {
         .route("/api/engines/start", post(start_engine_api))
         .route("/api/engines/build", post(build_engine_api))
         .route("/api/benchmarks", post(run_benchmark_api).get(list_benchmarks_stub))
+        .route("/api/engines", get(list_engines_api))
+        .route("/", get(serve_index))
+        .route("/models", get(serve_index))
+        .route("/servers", get(serve_index))
+        .route("/benchmarks", get(serve_index))
+        .route("/settings", get(serve_index))
         .nest_service("/assets", ServeDir::new("src/frontend/dist/assets"))
         .nest_service("/css", ServeDir::new("src/frontend/dist/css"))
         .nest_service("/js", ServeDir::new("src/frontend/dist/js"))
+        .nest_service("/static", ServeDir::new("src/frontend/static"))
         .fallback_service(ServeDir::new("src/frontend/dist/templates"))
         .with_state(server_state);
 
@@ -36,6 +43,11 @@ pub async fn start_server(app_state: Arc<AppState>) -> Result<()> {
     axum::serve(listener, app).await?;
     
     Ok(())
+}
+
+async fn serve_index() -> impl IntoResponse {
+    let content = tokio::fs::read_to_string("src/frontend/dist/templates/index.html").await.unwrap();
+    axum::response::Html(content)
 }
 
 async fn list_libraries(State(state): State<Arc<ServerState>>) -> Json<Vec<Library>> {
@@ -250,4 +262,54 @@ async fn run_benchmark_api(
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     if output.status.success() { stdout } else { format!("Benchmark failed: {}", stderr) }
+}
+
+#[derive(serde::Serialize)]
+struct EngineInfo {
+    name: String,
+    tag: String,
+    image_id: String,
+    created_at: String,
+    status: String,
+}
+
+async fn list_engines_api() -> Json<Vec<EngineInfo>> {
+    let output = std::process::Command::new("docker")
+        .args([
+            "images", 
+            "--format", "{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}",
+            "backyard*"
+        ])
+        .output()
+        .unwrap();
+    
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut engines = Vec::new();
+    
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 4 {
+            let repo = parts[0];
+            let tag = parts[1];
+            let id = parts[2];
+            let created = parts[3];
+            
+            // Check if any container is running with this image
+            let ps_output = std::process::Command::new("docker")
+                .args(["ps", "--filter", &format!("ancestor={}:{}", repo, tag), "--format", "{{.Status}}"])
+                .output()
+                .unwrap();
+            let ps_stdout = String::from_utf8_lossy(&ps_output.stdout);
+            let status = if ps_stdout.is_empty() { "stopped".to_string() } else { ps_stdout.trim().to_string() };
+
+            engines.push(EngineInfo {
+                name: repo.to_string(),
+                tag: tag.to_string(),
+                image_id: id.to_string(),
+                created_at: created.to_string(),
+                status,
+            });
+        }
+    }
+    Json(engines)
 }

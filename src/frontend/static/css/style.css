@@ -1,3 +1,4 @@
+* { outline: none !important; border-top: none !important; }
 :root {
     --bg-primary: #1a1612;
     --bg-secondary: #231d18;
@@ -98,7 +99,9 @@
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg-primary);
+    background: var(--bg-primary); /* Force pure black background to hide sub-pixel lines */ 
+    border: none;
+    outline: none;
     color: var(--text-primary);
     min-height: 100vh;
     line-height: 1.6;
@@ -120,6 +123,7 @@ body {
     max-width: 1800px;
     margin: 0 auto;
     padding: 0 24px;
+    border: none;
 }
 
 .container.full-width {
@@ -127,8 +131,9 @@ body {
 }
 
 header {
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); height: 72px; box-sizing: border-box;
     margin-bottom: 32px;
+    box-shadow: 0 1px 0 0 var(--bg-primary);
 }
 
 header h1 {
@@ -147,16 +152,9 @@ header h1 svg {
 }
 
 .header-with-tabs {
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); height: 72px; box-sizing: border-box;
     margin-bottom: 32px;
-}
-
-.header-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 0;
-    gap: 16px;
+    box-shadow: 0 1px 0 0 var(--bg-primary);
 }
 
 .width-toggle {
@@ -321,7 +319,7 @@ header h1 svg {
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); height: 72px; box-sizing: border-box;
     padding-bottom: 8px;
     color: var(--text-secondary);
     font-size: 0.9rem;
@@ -354,7 +352,7 @@ header h1 svg {
     justify-content: space-between;
     gap: 12px;
     padding: 10px 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); height: 72px; box-sizing: border-box;
 }
 
 .backend-list li:last-child {
@@ -363,7 +361,7 @@ header h1 svg {
 
 .engine-item {
     padding: 12px 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); height: 72px; box-sizing: border-box;
 }
 
 .engine-item:last-child {
@@ -431,7 +429,7 @@ header h1 svg {
     justify-content: space-between;
     align-items: flex-start;
     padding: 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); height: 72px; box-sizing: border-box;
 }
 
 .engine-card-header .engine-name {
@@ -678,7 +676,9 @@ header h1 svg {
 .form-group select {
     width: 100%;
     padding: 10px 14px;
-    background: var(--bg-primary);
+    background: var(--bg-primary); /* Force pure black background to hide sub-pixel lines */ 
+    border: none;
+    outline: none;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text-primary);
@@ -722,7 +722,9 @@ header h1 svg {
 .search-box input {
     flex: 1;
     padding: 12px 16px;
-    background: var(--bg-primary);
+    background: var(--bg-primary); /* Force pure black background to hide sub-pixel lines */ 
+    border: none;
+    outline: none;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text-primary);
@@ -771,7 +773,9 @@ header h1 svg {
 .view-switcher {
     display: flex;
     gap: 4px;
-    background: var(--bg-primary);
+    background: var(--bg-primary); /* Force pure black background to hide sub-pixel lines */ 
+    border: none;
+    outline: none;
     padding: 4px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -874,7 +878,7 @@ header h1 svg {
 .model-table td {
     padding: 12px 16px;
     text-align: left;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); height: 72px; box-sizing: border-box;
 }
 
 .model-table th {
@@ -1056,7 +1060,9 @@ header h1 svg {
 input[type="range"] {
     width: 100%;
     height: 6px;
-    background: var(--bg-primary);
+    background: var(--bg-primary); /* Force pure black background to hide sub-pixel lines */ 
+    border: none;
+    outline: none;
     border-radius: 3px;
     appearance: none;
     cursor: pointer;
@@ -1266,7 +1272,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .download-progress-bar {
     height: 4px;
-    background: var(--bg-primary);
+    background: var(--bg-primary); /* Force pure black background to hide sub-pixel lines */ 
+    border: none;
+    outline: none;
     border-radius: 2px;
     margin: 8px 0;
     overflow: hidden;
@@ -1755,7 +1763,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .auth-modal .form-group input {
     width: 100%;
     padding: 10px 12px;
-    background: var(--bg-primary);
+    background: var(--bg-primary); /* Force pure black background to hide sub-pixel lines */ 
+    border: none;
+    outline: none;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text-primary);
@@ -1763,7 +1773,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .auth-modal code {
-    background: var(--bg-primary);
+    background: var(--bg-primary); /* Force pure black background to hide sub-pixel lines */ 
+    border: none;
+    outline: none;
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 0.8rem;

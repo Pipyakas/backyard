@@ -99,11 +99,12 @@ After=network.target
 
 [Service]
 ExecStart={}
+WorkingDirectory={}
 Restart=always
 
 [Install]
 WantedBy=default.target
-"#, exe_path.display());
+"#, exe_path.display(), std::env::current_dir()?.display());
 
     std::fs::write(&service_path, service_content)?;
     println!("Service file installed at {}", service_path);

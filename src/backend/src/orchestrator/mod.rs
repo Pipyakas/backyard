@@ -83,12 +83,12 @@ impl Orchestrator {
         self.docker.create_container(
             Some(CreateContainerOptions { 
                 name: Some(container_name.clone()), 
-                platform: None,
+                platform: "".to_string(),
             }), 
             config
         ).await?;
         
-        self.docker.start_container(&container_name, None::<StartContainerOptions<String>>).await?;
+        self.docker.start_container(&container_name, None::<StartContainerOptions>).await?;
 
         Ok(container_name)
     }

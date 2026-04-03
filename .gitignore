@@ -1,4 +1,8 @@
-# Python
+# Build artifacts
+src/backend/target/
+src/frontend/dist/
+backend.log
+tests/
 __pycache__/
 *.py[cod]
 *$py.class

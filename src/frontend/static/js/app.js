@@ -924,7 +924,7 @@ async function runBenchmark(e) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                backend_type: config.backend_type,
+                engine_tag: config.backend_type,
                 model_path: modelPath,
                 model: modelName,
                 vendor_backend: config.vendor_backend,
@@ -1137,7 +1137,7 @@ async function runBenchmark(e) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                backend_type: config.backend_type,
+                engine_tag: config.backend_type,
                 model_path: modelPath,
                 model: modelName,
                 vendor_backend: config.vendor_backend,
@@ -1409,7 +1409,7 @@ async function loadEngines() {
                     <div class="launch-method">
                         <span class="badge origin ${m.type}">${m.type}</span>
                         <span class="mono">${m.provider}</span>
-                        <span class="backend-tags">${m.backends.map(b => `<span class="badge ${b}">${b}</span>`).join('')}</span>
+                        <span class="backend-tags">${m.engines.map(b => `<span class="badge ${b}">${b}</span>`).join('')}</span>
                     </div>
                 `).join('')
                 : '<span class="text-muted" style="font-size: 0.8rem;">No launch methods available</span>';
@@ -1622,55 +1622,47 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadDashboardData() {
     try {
         // Load data in parallel
-        const [backendsRes, modelsRes] = await Promise.all([
-            fetch('/api/backends'),
-            fetch('/api/models')
+        const [modelsRes, enginesRes] = await Promise.all([
+            fetch("/api/models"),
+            fetch("/api/engines")
         ]);
-        
-        const [backends, models] = await Promise.all([
-            backendsRes.json(),
-            modelsRes.json()
-        ]);
+        const models = await modelsRes.json();
+        const engines = await enginesRes.json();
         
         // Populate backend selects
-        const qsBackend = document.getElementById('qs-backend');
-        const benchBackend = document.getElementById('bench-backend');
-        const dashboardBackends = document.getElementById('dashboard-backends');
+        const qsEngine = document.getElementById('qs-backend');
+        const benchEngine = document.getElementById('bench-backend');
+        const dashboardEngines = document.getElementById('dashboard-backends');
         
-        if (qsBackend) {
-            qsBackend.innerHTML = backends.map(b => 
-                `<option value="${b.type}">${b.name}</option>`
+        if (qsEngine) {
+            qsEngine.innerHTML = engines.map(b => 
+                `<option value="${b.tag}">${b.name.replace('backyard:', '')}:${b.tag}</option>`
             ).join('');
         }
         
-        if (benchBackend) {
-            benchBackend.innerHTML = backends.map(b => 
-                `<option value="${b.type}">${b.name}</option>`
+        if (benchEngine) {
+            benchEngine.innerHTML = engines.map(b => 
+                `<option value="${b.tag}">${b.name.replace('backyard:', '')}:${b.tag}</option>`
             ).join('');
         }
         
-        if (dashboardBackends) {
-            if (backends.length === 0) {
-                dashboardBackends.innerHTML = '<li class="empty-state">No engines found</li>';
+        if (dashboardEngines) {
+            if (engines.length === 0) {
+                dashboardEngines.innerHTML = '<li class="empty-state">No engines found</li>';
             } else {
-                dashboardBackends.innerHTML = backends.map(engine => {
-                    const launchMethodsHtml = engine.launchMethods.length > 0
-                        ? engine.launchMethods.map(m => `
-                            <div class="launch-method">
-                                <span class="badge origin ${m.type}">${m.type}</span>
-                                <span class="backend-tags">${m.backends.map(b => `<span class="badge ${b}">${b}</span>`).join('')}</span>
-                            </div>
-                        `).join('')
-                        : '<span class="text-muted">No launch methods available</span>';
-                    
+                dashboardEngines.innerHTML = engines.map(engine => {
+                    const statusClass = engine.status === 'stopped' ? 'secondary' : 'success';
                     return `
                         <li class="engine-item">
                             <div class="engine-header">
-                                <span class="engine-name">${engine.name}</span>
-                                <span class="engine-version">${engine.version} (${engine.date})</span>
+                                <span class="engine-name">${engine.name.replace('backyard:', '')}</span>
+                                <span class="badge ${statusClass}">${engine.status}</span>
                             </div>
-                            <div class="engine-methods">
-                                ${launchMethodsHtml}
+                            <div class="engine-version" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                                Tag: ${engine.tag} | ID: ${engine.image_id.substring(0, 12)}
+                            </div>
+                            <div class="engine-date" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                                Built: ${engine.created_at}
                             </div>
                         </li>
                     `;
@@ -1678,7 +1670,7 @@ async function loadDashboardData() {
             }
         }
         
-        window.allBackends = backends;
+        window.allEngines = engines;
         
         // Populate model selects
         const qsModel = document.getElementById('qs-model');
