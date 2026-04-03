@@ -1,4 +1,9 @@
-* { outline: none !important; border-top: none !important; }
+html {
+    scrollbar-gutter: stable;
+}
+
+
+
 :root {
     --bg-primary: #1a1612;
     --bg-secondary: #231d18;
@@ -264,12 +269,10 @@ header h1 svg {
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(4px);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
     }
 }
 
@@ -1492,15 +1495,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     animation: fadeIn 0.2s ease;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
+/* Unified fadeIn keyframes moved to top of file */
 
 .modal-content {
     background: var(--bg-secondary);
