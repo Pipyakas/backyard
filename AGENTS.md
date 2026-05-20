@@ -4,158 +4,125 @@ This file is the operating guide for coding agents working in this repository.
 
 ## 1) What This Repo Is
 
-Backyard is a local-first LLM lab app with:
-- TypeScript/Fastify backend API (`apps/api/`)
-- Vanilla JS frontend with Vite (`apps/web/`)
-- SQLite persistence with Drizzle ORM (`~/.local/share/backyard/data/db/`)
-- Unified CLI for management (`apps/api/bin/backyard`)
+Backyard is a local-first LLM lab desktop app with:
+- Tauri v2 desktop shell (cross-platform Windows + Linux)
+- Rust/Axum backend API (`src/backend/src/`)
+- Vanilla JS frontend with Vite (`src/frontend/`)
+- SQLite persistence with rusqlite (`~/.backyard/data.db`)
+- System tray with background running support
 
 ## 2) Project Structure
 
 ```
-apps/
-  api/           # TypeScript/Fastify backend
+.github/
+src/
+  frontend/       # Vanilla JS web UI (Vite)
+    static/       # CSS, JS, assets
+    templates/    # HTML templates (index.html, auth.html)
+  backend/        # Rust/Axum backend (Tauri desktop app + API)
     src/
-      index.ts   # Entry point
-      app.ts     # Fastify app setup
-      db/        # Database (Drizzle ORM + better-sqlite3)
-      routes/    # API routes
-      services/  # Business logic
-    bin/
-      backyard   # Unified CLI
-  web/           # Vanilla JS frontend with Vite
-    src/
-      app.ts     # Main frontend logic
-      api/       # API client
-      types/     # TypeScript types
-containers/      # Dockerfiles for various engines
-docs/            # Documentation and benchmarks
+      main.rs     # Tauri entry point, system tray, window management
+      state/      # Database state (rusqlite)
+      server/     # Axum HTTP server and API routes
+      cli/        # CLI subcommands
+      orchestrator/ # Docker container management
+      memory.rs   # RAM usage tracking
+      config.rs   # App config persistence
+    Cargo.toml
+    tauri.conf.json
+    capabilities/
+  scripts/        # Build + run scripts
+    Makefile      # Build orchestration
+    build.bat     # Windows build script
+    run.bat       # Windows run script
+containers/       # Dockerfiles for various engines
+docs/             # Documentation and benchmarks
 ```
 
 ## 3) Build Commands
 
 ```bash
 make bootstrap                 # Install all dependencies
-make build                     # Build both api and web
-make install                   # Link backyard CLI to ~/.local/bin
+make build                     # Build frontend + Tauri desktop app
+make dev                       # Run in Tauri dev mode (frontend + desktop)
+make frontend                  # Build frontend only
+make install                   # Install binary to PATH (Linux/macOS)
 ```
 
-## 4) Test Commands
+Or directly:
+```bash
+cd src/frontend && npm install && npm run build
+cd src/backend && cargo build --release
+# Or for development:
+cd src/backend && cargo run
+```
+
+## 4) Architecture
+
+- **Desktop app**: Tauri v2 wraps the web frontend in a native window
+- **Backend API**: Axum HTTP server runs on `localhost:5556` in a Tauri background task
+- **System tray**: Minimizes to tray on close; tray menu has Show/Hide/Quit
+- **Frontend**: Vanilla JS makes `fetch()` calls to the Axum API
+- **Database**: SQLite via rusqlite, stored at `$HOME/.backyard/data.db` (Linux) or `%USERPROFILE%\.backyard\data.db` (Windows)
+
+## 5) Platform Support
+
+- **Windows**: Full support via Tauri; Docker/GPU features require Docker Desktop + WSL2
+- **Linux**: Full support including systemd service management and GPU passthrough
+- System tray works on both Windows and GNOME/KDE (requires `libayatana-appindicator3-1` on Linux)
+
+## 6) Test Commands
 
 ```bash
-make test                      # Run all E2E tests
-backyard status                # Check service status via CLI
-backyard service log           # Check logs via CLI
+cd src/backend && cargo test
 ```
 
-## 5) Type Checking
+## 7) Type Checking
 
 ```bash
-cd apps/api && npx tsc --noEmit
-cd apps/web && npx tsc --noEmit
+cd src/frontend && npx tsc --noEmit
+cd src/backend && cargo check
 ```
 
-## 6) Code Style Guidelines
+## 8) Code Style Guidelines
 
-### TypeScript (backend)
-- **Types**: Use explicit types, avoid `any`. Define interfaces for all data structures.
-- **Imports**: Use ES modules with `.js` extension (e.g., `import { foo } from './bar.js'`)
+### Rust (backend)
 - **Naming**: `camelCase` functions/variables, `PascalCase` types, `snake_case` database tables
-- **Error handling**: Return `{ success: false, error: "..." }` for API failures
-- **Validation**: Use Zod schemas for input validation (see `apps/api/src/routes/models.ts`)
-- **Logging**: Use Fastify's built-in logger (`app.log.info`, `app.log.error`)
+- **Error handling**: Use `anyhow::Result` with `.context()` for all operations
+- **Platform checks**: Use `#[cfg(target_os = "...")]` for platform-specific code
+- **Home directory**: Use `USERPROFILE` on Windows, `HOME` on Linux (with cfg! macros)
 
 ### JavaScript (frontend)
 - Use `async/await` for all fetch operations
 - Always handle fetch failure paths and show UI feedback via `showNotification`
 - Validate user input before sending to API
 
-### Shell scripts
-- Use `#!/usr/bin/env bash` and `set -euo pipefail`
-- Quote all variable expansions: `"$variable"`
-- Prefer idempotent behavior
+## 9) API Design Patterns
 
-## 7) API Design Patterns
-
-- **Response format**: Always return JSON consistently:
+- **Response format**: Return JSON consistently:
   - Success: `{ success: true, ...data }`
   - Failure: `{ success: false, error: "..." }`
-- **Input validation**: Use Zod schemas to validate incoming JSON
 - **HTTP status codes**: Use appropriate codes (200, 400, 404, 500)
-- **Avoid**: Never expose raw stack traces to clients
+- **Input validation**: Validate incoming JSON in route handlers
 
-## 8) Error Handling + Logging
+## 10) Key Environment Variables
 
-- Backend uses Fastify's built-in logger
-- Wrap all subprocess and file operations in try/catch
-- Log concise context with failures (include relevant IDs, names, or state)
-- For long-running operations (downloads, benchmarks), set meaningful status: `queued` → `running` → `completed`/`failed`
-
-## 9) Persistence and State Rules
-
-- All runtime data must go through SQLite with Drizzle ORM
-- Keep status transitions explicit: `queued/running/completed/failed`
-- Define table schemas in `apps/api/src/db/schema.ts`
-- Use migrations: `npm run db:generate` and `npm run db:migrate`
-
-## 10) Repo-Specific Guardrails
-
-- Do not commit model weights, secrets, or credentials
-- `.env` and `*.key` files are gitignored
-- Avoid editing `engines/*` unless explicitly required
-
-## 11) API-First Principle
-
-**Always prioritize using Backyard's own APIs before resorting to bash commands.** We are building functionalities into the app — use the app to do things.
-
-- Use `curl` or the frontend to interact with models, libraries, downloads, servers, benchmarks, and engines via their API endpoints
-- Only use direct `sqlite3` commands, filesystem manipulation, or shell scripts when:
-  - No API endpoint exists yet for the operation
-  - You are debugging or investigating state
-  - The task is explicitly about bootstrapping or infrastructure setup
-- If you find yourself needing to do something via bash that should be an API action, implement the API endpoint first, then use it
-- This keeps behavior consistent, testable, and aligned with how users will actually interact with the app
-
-## 12) Environment Variables
-
-Key env vars (defined in `apps/api/src/app.ts`):
-- `BACKYARD_HOST` (default `0.0.0.0`)
-- `BACKYARD_PORT` (default `5556`)
-- `BACKYARD_MODELS_DIR` (default `~/.local/share/backyard/models`)
-- `BACKYARD_DB_PATH` (default `~/.local/share/backyard/data/db/backyard.db`)
-- `SECRET_KEY` - Cookie signing (auto-generated if missing)
-- `BACKYARD_ADMIN_API_KEY` - Admin API key
+- `BACKYARD_HOST` (default `127.0.0.1`) - Axum server bind address
+- `BACKYARD_PORT` (default `5556`) - Axum server port
 - `HF_TOKEN` - HuggingFace token for downloads
 
-## 13) Typical Agent Workflow
-
-1. Read impacted backend/frontend files before changing behavior
-2. Implement smallest safe change
-3. **Rebuild the application**: `make build`
-4. **Interact via the CLI**: Use the `backyard` binary to verify changes (e.g., `backyard models`, `backyard service restart`)
-5. **Verify with Tests**: `make test`
-6. Run type check: `npx tsc --noEmit`
-7. Verify frontend changes visually
-
-## 14) Quick Command Cheat Sheet
+## 11) Quick Command Cheat Sheet
 
 ```bash
 # Development
-cd apps/api && npm run dev      # Backend
-cd apps/web && npm run dev      # Frontend
-make dev                        # Both
+cd src/backend && cargo run      # Tauri dev mode
+cd src/frontend && npm run dev     # Vite dev server (standalone)
 
-# Testing
-cd apps/api && npm run test:e2e
-cd apps/api && npx playwright test tests/e2e/dashboard.spec.ts
+# Building
+make build                         # Full build
+cd src/backend && cargo build --release  # Tauri release build
 
 # Type checking
-cd apps/api && npx tsc --noEmit
-cd apps/web && npx tsc --noEmit
-
-# Health check
-backyard service status
+cd src/frontend && npx tsc --noEmit
+cd src/backend && cargo check
 ```
-
-When in doubt: prefer small, reversible changes; verify with a focused command; keep API contracts stable.
-

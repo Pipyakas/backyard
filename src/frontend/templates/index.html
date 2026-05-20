@@ -32,11 +32,6 @@
                     <a href="/settings" class="tab" data-tab="settings">Settings</a>
                 </nav>
 
-                <div class="width-toggle-container">
-                    <button id="width-toggle-btn" class="btn ghost width-toggle" onclick="toggleWidth()" title="Toggle full width">
-                        Normal
-                    </button>
-                </div>
             </div>
         </div>
     </header>
@@ -322,6 +317,35 @@
                     <h3>Engines</h3>
                     <div id="engines-list" class="engines-list">
                         
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Appearance</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Color Theme</label>
+                            <select id="theme-select" onchange="setTheme(this.value)">
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                                <option value="system">System</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Accent</label>
+                            <select id="accent-select" onchange="setAccent(this.value)">
+                                <option value="gray">Gray</option>
+                                <option value="blue">Blue</option>
+                                <option value="green">Green</option>
+                                <option value="amber">Amber</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group checkbox">
+                            <input type="checkbox" id="close-to-tray-toggle" onchange="setCloseToTray(this.checked)">
+                            <label for="close-to-tray-toggle">Minimize to tray when closing window</label>
+                        </div>
                     </div>
                 </div>
 

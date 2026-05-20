@@ -1,10 +1,11 @@
+#![allow(dead_code)]
+
 use clap::{Parser, Subcommand};
-use std::process::Command;
-use anyhow::{Result, Context};
+use anyhow::Result;
 
 #[derive(Parser)]
 #[command(name = "backyard")]
-#[command(about = "Backyard backend and CLI tool", long_about = None)]
+#[command(about = "Backyard desktop app and CLI tool", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -14,7 +15,7 @@ pub struct Cli {
 pub enum Commands {
     /// Query and list available models
     Models,
-    /// Manage the backyard systemd service
+    /// Manage the backyard background service
     Service {
         #[command(subcommand)]
         action: ServiceAction,
@@ -28,18 +29,19 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum ServiceAction {
-    /// Install the systemd user service
+    /// Install the systemd user service (Linux only)
     Install,
-    /// Start the backyard service
+    /// Start the backyard service (Linux only)
     Start,
-    /// Stop the backyard service
+    /// Stop the backyard service (Linux only)
     Stop,
-    /// Show service status
+    /// Show service status (Linux only)
     Status,
-    /// Show service logs
+    /// Show service logs (Linux only)
     Log,
 }
 
+#[allow(dead_code)]
 pub async fn handle_command(cli: Cli, state: &crate::state::State) -> Result<()> {
     match cli.command {
         Some(Commands::Models) => {
@@ -47,19 +49,29 @@ pub async fn handle_command(cli: Cli, state: &crate::state::State) -> Result<()>
             if models.is_empty() {
                 println!("No models found.");
             } else {
-                println!("{:<5} {:<30} {:<20} {:<10} {:<10}", "ID", "Name", "Family", "Quant", "Lib ID");
+                println!(
+                    "{:<5} {:<30} {:<20} {:<10} {:<10}",
+                    "ID", "Name", "Family", "Quant", "Lib ID"
+                );
                 for m in models {
                     let family = m.family.unwrap_or_else(|| "-".to_string());
                     let quant = m.quant.unwrap_or_else(|| "-".to_string());
-                    println!("{:<5} {:<30} {:<20} {:<10} {:<10}", m.id, m.name, family, quant, m.library_id);
+                    println!(
+                        "{:<5} {:<30} {:<20} {:<10} {:<10}",
+                        m.id, m.name, family, quant, m.library_id
+                    );
                 }
             }
             Ok(())
         }
         Some(Commands::Service { action }) => handle_service_action(action),
-        Some(Commands::Download { repo_id, filename }) => {
+        Some(Commands::Download {
+            repo_id,
+            filename,
+        }) => {
             let client = reqwest::Client::new();
-            let res = client.post("http://localhost:5556/api/models/download")
+            let res = client
+                .post("http://localhost:5556/api/models/download")
                 .json(&serde_json::json!({ "repo_id": repo_id, "filename": filename }))
                 .send()
                 .await?;
@@ -67,13 +79,13 @@ pub async fn handle_command(cli: Cli, state: &crate::state::State) -> Result<()>
             Ok(())
         }
         None => {
-            // Default action: start the web server (Phase 5)
             println!("Starting web server (stub)...");
             Ok(())
         }
     }
 }
 
+#[allow(dead_code)]
 fn handle_service_action(action: ServiceAction) -> Result<()> {
     match action {
         ServiceAction::Install => install_service(),
@@ -84,17 +96,34 @@ fn handle_service_action(action: ServiceAction) -> Result<()> {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
 fn install_service() -> Result<()> {
-    let exe_path = std::env::current_exe()
-        .context("Failed to get current executable path")?;
+    anyhow::bail!("Service management is only supported on Linux with systemd")
+}
+
+#[cfg(not(target_os = "linux"))]
+fn run_systemctl(_action: &str) -> Result<()> {
+    anyhow::bail!("Service management is only supported on Linux with systemd")
+}
+
+#[cfg(not(target_os = "linux"))]
+fn tail_logs() -> Result<()> {
+    anyhow::bail!("Service logs are only available on Linux with journalctl")
+}
+
+#[cfg(target_os = "linux")]
+fn install_service() -> Result<()> {
+    use std::process::Command;
+
+    let exe_path = std::env::current_exe().context("Failed to get current executable path")?;
     let home_dir = std::env::var("HOME").context("HOME env var not set")?;
     let service_dir = format!("{}/.config/systemd/user", home_dir);
     std::fs::create_dir_all(&service_dir)?;
-    
+
     let service_path = format!("{}/backyard.service", service_dir);
     let service_content = format!(
-r#"[Unit]
-Description=Backyard Backend Service
+        r#"[Unit]
+Description=Backyard Service
 After=network.target
 
 [Service]
@@ -104,31 +133,40 @@ Restart=always
 
 [Install]
 WantedBy=default.target
-"#, exe_path.display(), std::env::current_dir()?.display());
+"#,
+        exe_path.display(),
+        std::env::current_dir()?.display()
+    );
 
     std::fs::write(&service_path, service_content)?;
     println!("Service file installed at {}", service_path);
-    
+
     Command::new("systemctl")
         .args(["--user", "daemon-reload"])
         .status()?;
-        
+
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
 fn run_systemctl(action: &str) -> Result<()> {
+    use std::process::Command;
+
     let status = Command::new("systemctl")
         .args(["--user", action, "backyard.service"])
         .status()
         .context(format!("Failed to execute systemctl {}", action))?;
-        
+
     if !status.success() {
         anyhow::bail!("systemctl {} failed", action);
     }
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
 fn tail_logs() -> Result<()> {
+    use std::process::Command;
+
     Command::new("journalctl")
         .args(["--user", "-u", "backyard.service", "-f"])
         .status()

@@ -18,7 +18,7 @@ pub struct Model {
     pub id: i64,
     pub name: String,
     pub library_id: i64,
-    pub path: String, // Relative to library root
+    pub path: String,
     pub format: String,
     pub family: Option<String>,
     pub quant: Option<String>,
@@ -30,17 +30,23 @@ pub struct State {
 
 impl State {
     pub fn init() -> Result<Self> {
-        let home_dir = std::env::var("HOME").context("HOME env var not set")?;
+        let home_dir = if cfg!(target_os = "windows") {
+            std::env::var("USERPROFILE").context("USERPROFILE env var not set")?
+        } else {
+            std::env::var("HOME").context("HOME env var not set")?
+        };
         let backyard_dir = PathBuf::from(&home_dir).join(".backyard");
         std::fs::create_dir_all(&backyard_dir)?;
-        
+
         let db_path = backyard_dir.join("data.db");
         let conn = Connection::open(db_path)?;
-        
-        let state = Self { conn: Mutex::new(conn) };
+
+        let state = Self {
+            conn: Mutex::new(conn),
+        };
         state.create_tables()?;
         state.ensure_default_library(&home_dir)?;
-        
+
         Ok(state)
     }
 
@@ -79,27 +85,31 @@ impl State {
             [],
         )?;
 
+        // Enable WAL mode for better concurrent performance
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;")?;
+
         Ok(())
     }
 
     fn ensure_default_library(&self, home_dir: &str) -> Result<()> {
         let default_path = PathBuf::from(home_dir).join(".backyard").join("models");
         std::fs::create_dir_all(&default_path)?;
-        
+
         let path_str = default_path.to_str().context("Invalid path")?;
-        
+
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT OR IGNORE INTO libraries (name, path) VALUES (?, ?)",
             params!["Default", path_str],
         )?;
-        
+
         Ok(())
     }
 
     pub fn list_models(&self) -> Result<Vec<Model>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id, name, library_id, path, format, family, quant FROM models")?;
+        let mut stmt = conn
+            .prepare("SELECT id, name, library_id, path, format, family, quant FROM models")?;
         let model_iter = stmt.query_map([], |row| {
             Ok(Model {
                 id: row.get(0)?,

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/refs/heads/dev/crates/tauri-cli/schema.json",
+  "productName": "Backyard",
+  "version": "0.1.0",
+  "identifier": "com.backyard.app",
+  "build": {
+    "frontendDist": "../frontend/dist",
+    "devUrl": "http://localhost:5556",
+    "beforeDevCommand": "cd src/frontend && npm run build",
+    "beforeBuildCommand": "cd src/frontend && npm install && npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Backyard",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {}
+}

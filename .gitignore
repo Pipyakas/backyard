@@ -1,5 +1,5 @@
 # Build artifacts
-src/backend/target/
+src/tauri/target/
 src/frontend/dist/
 backend.log
 tests/
@@ -18,17 +18,11 @@ env/
 # Node
 node_modules/
 src/frontend/node_modules/
-src/backend/node_modules/
 *.lock
 package-lock.json
 src/frontend/package-lock.json
 
 # TypeScript
-src/frontend/src/
-src/frontend/tsconfig.json
-src/frontend/tsconfig.node.json
-src/frontend/vite.config.ts
-src/backend/dist/
 
 # Benchmark results
 benchmarks/*.json
@@ -54,9 +48,7 @@ logs/benchmark/*.json
 logs/benchmark/*.csv
 
 # Runtime state
-src/backyard_users.json
 backyard_sessions.json
-src/backyard_users.json
 *.session
 
 # Caddy

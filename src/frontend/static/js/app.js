@@ -1,5 +1,51 @@
 // Backyard - Llama.cpp Launcher JavaScript
 
+// Theme management
+function setAccent(accent) {
+    document.documentElement.setAttribute('data-accent', accent);
+    localStorage.setItem('accent', accent);
+}
+
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    const select = document.getElementById('theme-select');
+    if (select) select.value = theme;
+}
+
+function initTheme() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    setTheme(saved);
+    const accent = localStorage.getItem('accent') || 'gray';
+    setAccent(accent);
+    const accentSelect = document.getElementById('accent-select');
+    if (accentSelect) accentSelect.value = accent;
+
+    // Load close-to-tray preference from API
+    loadCloseToTray();
+}
+
+async function loadCloseToTray() {
+    try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+        const toggle = document.getElementById('close-to-tray-toggle');
+        if (toggle) toggle.checked = cfg.close_to_tray;
+    } catch (_) {}
+}
+
+async function setCloseToTray(enabled) {
+    try {
+        await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ close_to_tray: enabled })
+        });
+    } catch (_) {}
+}
+
+initTheme();
+
 let selectedModelId = null;
 let selectedFiles = [];
 let modelsBasePath = '/models';
@@ -71,28 +117,6 @@ function initTabs() {
         loadTabContent(window.location.pathname);
     });
 }
-
-// Full width toggle
-function toggleWidth() {
-    const container = document.querySelector('.main-container');
-    const btn = document.getElementById('width-toggle-btn');
-    const isFull = container.classList.toggle('full-width');
-    btn.textContent = isFull ? 'Full' : 'Normal';
-    localStorage.setItem('fullWidth', isFull);
-}
-
-function initWidth() {
-    const fullWidth = localStorage.getItem('fullWidth') === 'true';
-    if (fullWidth) {
-        const container = document.querySelector('.main-container');
-        if (container) container.classList.add('full-width');
-        const btn = document.getElementById('width-toggle-btn');
-        if (btn) btn.textContent = 'Full';
-    }
-}
-
-// Initialize width on load
-initWidth();
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
