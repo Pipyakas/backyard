@@ -24,6 +24,7 @@ pub fn run_harness(run: &Run, endpoint: &EvalEndpoint) -> Result<(String, Vec<Ru
         "micro_swe" => run_micro_swe(run, endpoint),
         "tbench" => run_tbench(run, endpoint),
         "deepswe" => run_deepswe(run, endpoint),
+        "opencode" => run_opencode(run, endpoint),
         "tau2_telecom" => run_tau2(run, endpoint, "telecom"),
         "tau2_retail" => run_tau2(run, endpoint, "retail"),
         "tau2_airline" => run_tau2(run, endpoint, "airline"),
@@ -224,6 +225,114 @@ fn run_deepswe(run: &Run, endpoint: &EvalEndpoint) -> Result<(String, Vec<RunRes
     }
     if results.is_empty() {
         bail!("no deepswe metrics in {}", results_path.display());
+    }
+    Ok((out, results))
+}
+
+/// Drive the `opencode` CLI agent inside pier against a deep-swe task.
+///
+/// The model under test is the opencode SDK implementation itself, served
+/// through CCGW: `-m ccgw/<model>` with an `opencode_config` stanza that
+/// registers the `ccgw` provider (baseURL + X-CCGW-Key). The `openai/`
+/// provider prefix does NOT work here (AI-SDK `Z.responses` error); the
+/// `ccgw/` prefix routes through the gateway's OpenAI-compatible endpoint.
+///
+/// The gateway key travels inside `opencode_config` (pier writes it to the
+/// sandbox's opencode.json). It is never passed as a bare env var because
+/// the pier agent only forwards OPENAI_BASE_URL for `openai/` models.
+fn run_opencode(run: &Run, endpoint: &EvalEndpoint) -> Result<(String, Vec<RunResult>)> {
+    let dir = evals_dir()?;
+    let jobs_dir = dir.join("jobs");
+    std::fs::create_dir_all(&jobs_dir)?;
+    let tasks_dir = dir.join("deep-swe/tasks");
+    if !tasks_dir.exists() {
+        bail!("deep-swe tasks not found in {}", tasks_dir.display());
+    }
+
+    let config: serde_json::Value = serde_json::from_str(&run.config).unwrap_or_default();
+    let task = config
+        .get("task")
+        .and_then(|v| v.as_str())
+        .unwrap_or("abs-stepped-slices")
+        .to_string();
+    let task_path = if task.contains('/') {
+        task.clone()
+    } else {
+        format!("tasks/{}", task)
+    };
+
+    let key = endpoint.api_key.clone().unwrap_or_default();
+    if key.is_empty() {
+        bail!("opencode harness needs an endpoint api_key (the CCGW gateway key)");
+    }
+    let base_v1 = format!("{}/v1", endpoint_base_root(endpoint));
+    let provider = endpoint.provider.clone().unwrap_or_else(|| "ccgw".to_string());
+    let model_id = model_name(endpoint);
+    let mut model_entry = serde_json::Map::new();
+    model_entry.insert(model_id.clone(), serde_json::Value::Object(serde_json::Map::new()));
+    let mut provider_entry = serde_json::Map::new();
+    provider_entry.insert("npm".to_string(), serde_json::Value::String("@ai-sdk/openai-compatible".to_string()));
+    provider_entry.insert("options".to_string(), serde_json::json!({
+        "baseURL": base_v1,
+        "headers": { "X-CCGW-Key": key },
+        "apiKey": key,
+    }));
+    provider_entry.insert("models".to_string(), serde_json::Value::Object(model_entry));
+    let mut providers = serde_json::Map::new();
+    providers.insert(provider.clone(), serde_json::Value::Object(provider_entry));
+    let mut root = serde_json::Map::new();
+    root.insert("provider".to_string(), serde_json::Value::Object(providers));
+    let opencode_config = serde_json::Value::Object(root);
+    let ak = format!("opencode_config={}", opencode_config);
+    let model_arg = format!("{}/{}", provider, model_id);
+
+    let args = [
+        "run",
+        "-p",
+        &task_path,
+        "-a",
+        "opencode",
+        "-m",
+        &model_arg,
+        "--ak",
+        &ak,
+        "-n",
+        "1",
+        "--jobs-dir",
+        jobs_dir.to_str().unwrap(),
+    ];
+    let out = run_capture(&find_pier(), &args, Some(&tasks_dir))?;
+
+    let Some(dirp) = newest_job_dir(&jobs_dir) else {
+        bail!("no pier job output found in {}", jobs_dir.display());
+    };
+    let results_path = dirp.join("result.json");
+    let text = std::fs::read_to_string(&results_path)
+        .map_err(|e| anyhow::anyhow!("cannot read {}: {}", results_path.display(), e))?;
+    let parsed: serde_json::Value = serde_json::from_str(&text)?;
+    let mut results = Vec::new();
+    if let Some(evals) = parsed.get("stats").and_then(|s| s.get("evals")).and_then(|e| e.as_object()) {
+        for (_name, eval) in evals {
+            if let Some(metrics) = eval.get("metrics").and_then(|m| m.as_array()) {
+                for m in metrics {
+                    for key in ["partial", "reward", "f2p", "p2p"] {
+                        if let Some(v) = m.get(key).and_then(|v| v.as_f64()) {
+                            results.push(RunResult {
+                                id: 0,
+                                run_id: 0,
+                                metric: format!("opencode_{}", key),
+                                value: v,
+                                unit: Some("score".into()),
+                                extra: Some(format!("{{\"task\":\"{}\"}}", task)),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if results.is_empty() {
+        bail!("no opencode metrics in {}", results_path.display());
     }
     Ok((out, results))
 }

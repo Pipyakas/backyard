@@ -264,12 +264,13 @@ async function logoutAdmin() {
 let lbData = { speed: [], quality: [] };
 let lbSort = { key: 'tps', dir: -1 };
 
-const QUALITY_METRICS = ['mswe_pass_rate', 'tau2_avg_reward', 'lcb_pass_at_1', 'swebench_resolved', 'toolathlon_score', 'frontierswe_score', 'deepswe_reward', 'deepswe_partial', 'tbench_reward', 'perf_speedup', 'score', 'pass_at_1', 'rouge_l_f1', 'success_rate'];
+const QUALITY_METRICS = ['mswe_pass_rate', 'tau2_avg_reward', 'lcb_pass_at_1', 'swebench_resolved', 'toolathlon_score', 'frontierswe_score', 'deepswe_reward', 'deepswe_partial', 'opencode_reward', 'opencode_partial', 'tbench_reward', 'perf_speedup', 'score', 'pass_at_1', 'rouge_l_f1', 'success_rate'];
 
 const HARNESS_LABELS = {
     mswe_pass_rate: 'micro_swe', tau2_avg_reward: 'tau2', lcb_pass_at_1: 'livecodebench',
     swebench_resolved: 'swebench', toolathlon_score: 'toolathlon', frontierswe_score: 'frontier-swe',
-    deepswe_reward: 'deepswe', deepswe_partial: 'deepswe', tbench_reward: 'tbench',
+    deepswe_reward: 'deepswe', deepswe_partial: 'deepswe',
+    opencode_reward: 'opencode', opencode_partial: 'opencode', tbench_reward: 'tbench',
     perf_speedup: 'perf_takehome', score: 'score', pass_at_1: 'pass@1', rouge_l_f1: 'rouge-l',
     success_rate: 'bench',
 };
@@ -729,7 +730,7 @@ async function loadEvalHistory() {
         }
         tbody.innerHTML = runs.map(r => {
             const m = r.metrics || {};
-            const score = m.mswe_pass_rate ?? m.tau2_avg_reward ?? m.lcb_pass_at_1 ?? m.swebench_resolved ?? m.toolathlon_score ?? m.frontierswe_score ?? m.deepswe_reward ?? m.tbench_reward ?? m.perf_speedup ?? m.score;
+            const score = m.mswe_pass_rate ?? m.tau2_avg_reward ?? m.lcb_pass_at_1 ?? m.swebench_resolved ?? m.toolathlon_score ?? m.frontierswe_score ?? m.deepswe_reward ?? m.opencode_reward ?? m.tbench_reward ?? m.perf_speedup ?? m.score;
             const target = endpointName(r.endpoint_id);
             return `<tr>
                 <td class="mono">#${r.id}</td>

@@ -312,7 +312,7 @@ async fn create_eval_run_api(State(state): State<RouterState>, Json(req): Json<C
     let endpoint = match state.app_state.get_eval_endpoint(req.endpoint_id) {
         Ok(e) => e, Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "success": false, "error": "Endpoint not found" }))).into_response(),
     };
-    let known = ["micro_swe","tbench","deepswe","tau2_telecom","tau2_retail","tau2_airline","tau2_mock","livecodebench","swebench","toolathlon","frontierswe","osworld","perf_takehome"];
+    let known = ["micro_swe","tbench","deepswe","opencode","tau2_telecom","tau2_retail","tau2_airline","tau2_mock","livecodebench","swebench","toolathlon","frontierswe","osworld","perf_takehome"];
     if !known.contains(&req.harness.as_str()) {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "success": false, "error": "Unknown harness" }))).into_response();
     }
@@ -370,7 +370,7 @@ async fn get_run_results_api(State(state): State<RouterState>, Path(id): Path<i6
     }
 }
 
-const LEADERBOARD_METRICS: &[&str] = &["tps","tg_tps","latency_ms","ttft_ms","score","pass_at_1","rouge_l_f1","success_rate","mswe_pass_rate","tau2_avg_reward","lcb_pass_at_1","swebench_resolved","toolathlon_score","frontierswe_score","deepswe_reward","tbench_reward","perf_speedup","perf_cycles","perf_thresholds"];
+const LEADERBOARD_METRICS: &[&str] = &["tps","tg_tps","latency_ms","ttft_ms","score","pass_at_1","rouge_l_f1","success_rate","mswe_pass_rate","tau2_avg_reward","lcb_pass_at_1","swebench_resolved","toolathlon_score","frontierswe_score","deepswe_reward","deepswe_partial","opencode_reward","opencode_partial","tbench_reward","perf_speedup","perf_cycles","perf_thresholds"];
 
 async fn leaderboard(State(state): State<RouterState>) -> Json<serde_json::Value> {
     let conn = state.app_state.conn.lock().unwrap();
