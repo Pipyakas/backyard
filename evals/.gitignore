@@ -1,0 +1,19 @@
+# Backyard run outputs produced by harness.rs / worker.rs
+jobs/
+results/
+__pycache__/
+
+# Local Python environments (recreated via uv/pip)
+.venv/
+venv/
+*.egg-info/
+
+# tau2-bench runtime data (simulations grow per run) and caches
+tau2-bench/data/
+tau2-bench/.venv/
+tau2-bench/.pytest_cache/
+tau2-bench/.mypy_cache/
+
+# terminal-bench: harness pulls terminal-bench/terminal-bench-2 from the Harbor
+# Hub at runtime; the local tasks/ snapshot is machine-local, never committed.
+terminal-bench/

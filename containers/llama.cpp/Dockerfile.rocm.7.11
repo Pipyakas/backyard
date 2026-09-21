@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-dev \
     libglu1-mesa-dev \
     python3-dev \
+    libcurl4-openssl-dev \
     vim-common \
     wget \
     && rm -rf /var/lib/apt/lists/*
@@ -82,6 +83,7 @@ RUN cmake -B build \
     -DCMAKE_BUILD_TYPE=Release \
     -DGGML_HIP=ON \
     -DAMDGPU_TARGETS=gfx1031 \
+    -DLLAMA_CURL=ON \
     -DLLAMA_BUILD_SERVER=ON \
     -DCMAKE_PREFIX_PATH=/opt/rocm \
     -DGGML_ROCM=ON . \

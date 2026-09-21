@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     glslc \
     python3-pip \
     libssl-dev \
+    libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -36,6 +37,7 @@ RUN cmake -B build \
     -DGGML_CPU_ALL_VARIANTS=ON \
     -DGGML_CUDA=ON \
     -DGGML_VULKAN=ON \
+    -DLLAMA_CURL=ON \
     -DLLAMA_BUILD_SERVER=ON \
     -DLLAMA_BUILD_TESTS=OFF \
     -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" . \

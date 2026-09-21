@@ -1,0 +1,60 @@
+diff --git a/lcb_runner/prompts/self_repair.py b/lcb_runner/prompts/self_repair.py
+index 21ded04..909f12d 100644
+--- a/lcb_runner/prompts/self_repair.py
++++ b/lcb_runner/prompts/self_repair.py
+@@ -1,6 +1,10 @@
+ import json
+ 
+-from anthropic import HUMAN_PROMPT, AI_PROMPT
++try:
++    from anthropic import HUMAN_PROMPT, AI_PROMPT
++except ImportError:
++    HUMAN_PROMPT = None
++    AI_PROMPT = None
+ 
+ from lcb_runner.lm_styles import LMStyle
+ 
+diff --git a/lcb_runner/prompts/test_output_prediction.py b/lcb_runner/prompts/test_output_prediction.py
+index 90d8719..1fa473e 100644
+--- a/lcb_runner/prompts/test_output_prediction.py
++++ b/lcb_runner/prompts/test_output_prediction.py
+@@ -1,6 +1,10 @@
+ import json
+ 
+-from anthropic import HUMAN_PROMPT, AI_PROMPT
++try:
++    from anthropic import HUMAN_PROMPT, AI_PROMPT
++except ImportError:
++    HUMAN_PROMPT = None
++    AI_PROMPT = None
+ 
+ from lcb_runner.lm_styles import LMStyle
+ from lcb_runner.benchmarks import TestOutputPredictionProblem
+diff --git a/lcb_runner/runner/oai_runner.py b/lcb_runner/runner/oai_runner.py
+index 59e2074..06b2040 100644
+--- a/lcb_runner/runner/oai_runner.py
++++ b/lcb_runner/runner/oai_runner.py
+@@ -12,8 +12,13 @@ from lcb_runner.runner.base_runner import BaseRunner
+ 
+ 
+ class OpenAIRunner(BaseRunner):
++    # Env-driven client: honors OPENAI_API_KEY/OPENAI_KEY and OPENAI_BASE_URL,
++    # so custom OpenAI-compatible endpoints (e.g. local llama-server) work.
++    # BACKYARD_MODEL overrides the model id sent on the wire (the --model arg
++    # must still be a valid LanguageModelStore key for routing/output paths).
+     client = OpenAI(
+-        api_key=os.getenv("OPENAI_KEY"),
++        api_key=os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_KEY"),
++        base_url=os.getenv("OPENAI_BASE_URL") or None,
+     )
+ 
+     def __init__(self, args, model):
+@@ -34,7 +39,7 @@ class OpenAIRunner(BaseRunner):
+             }
+         else:
+             self.client_kwargs: dict[str | str] = {
+-                "model": args.model,
++                "model": os.getenv("BACKYARD_MODEL") or args.model,
+                 "temperature": args.temperature,
+                 "max_tokens": args.max_tokens,
+                 "top_p": args.top_p,

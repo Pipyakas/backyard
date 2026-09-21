@@ -1,0 +1,20 @@
+services:
+  backyard:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: backyard-web:latest
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - backyard-data:/data
+    environment:
+      PORT: 8080
+      BACKYARD_DATA_DIR: /data
+      BACKYARD_EVALS_DIR: /app/evals
+      # Set to 1 to allow unauthenticated writes (single-user). Otherwise configure admin via UI.
+      BACKYARD_AUTH_DISABLED: 1
+    restart: unless-stopped
+
+volumes:
+  backyard-data:
