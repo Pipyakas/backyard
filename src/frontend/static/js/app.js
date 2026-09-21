@@ -282,7 +282,9 @@ async function loadLeaderboard() {
         const m = data.metrics || {};
         buildLeaderboardModel(m);
         const upd = $('lb-updated-at');
-        if (upd) upd.textContent = `· updated ${new Date().toLocaleTimeString()}`;
+        if (upd) upd.textContent = `Updated ${new Date().toLocaleString()}`;
+        const foot = $('lb-footer-updated');
+        if (foot) foot.textContent = `Updated ${new Date().toLocaleString()}`;
         populateLbFilters();
         renderLeaderboardTables();
         loadEndpointsStrip();
@@ -372,6 +374,7 @@ function renderLeaderboardTables() {
     renderSpeedLb();
     renderQualityLb();
     renderHighlights();
+    renderInsights();
     document.querySelectorAll('#leaderboard-speed th[data-sort]').forEach(th => {
         th.classList.toggle('sorted-desc', th.dataset.sort === lbSort.key && lbSort.dir === -1);
         th.classList.toggle('sorted-asc', th.dataset.sort === lbSort.key && lbSort.dir === 1);
@@ -382,6 +385,44 @@ function renderLeaderboardTables() {
             renderSpeedLb();
         };
     });
+}
+
+function toggleLbSection(which) {
+    const wrap = $(which === 'speed' ? 'lb-speed-wrap' : 'lb-quality-wrap');
+    const btn = $(which === 'speed' ? 'lb-toggle-speed' : 'lb-toggle-quality');
+    if (!wrap || !btn) return;
+    const hidden = wrap.style.display === 'none';
+    wrap.style.display = hidden ? '' : 'none';
+    btn.classList.toggle('on', hidden);
+}
+
+function shortModel(name) {
+    const base = String(name || '').split('/').pop();
+    return base.length > 42 ? base.slice(0, 41) + '…' : base;
+}
+
+// Stable per-endpoint color for the model-cell left rule (AA creator color).
+function epColor(name) {
+    let h = 0;
+    for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return `hsl(${h % 360} 55% 55%)`;
+}
+
+function renderInsights() {
+    const el = $('lb-insights');
+    if (!el) return;
+    const out = [];
+    const byTps = [...lbData.speed].filter(r => r.tps !== undefined).sort((a, b) => b.tps - a.tps);
+    if (byTps.length > 1) {
+        out.push(`<strong>${esc(shortModel(byTps[0].model))}</strong> and <strong>${esc(shortModel(byTps[1].model))}</strong> are the fastest models${byTps[0].endpoint === byTps[1].endpoint ? ` on ${esc(byTps[0].endpoint)}` : ''}.`);
+    } else if (byTps.length === 1) {
+        out.push(`<strong>${esc(shortModel(byTps[0].model))}</strong> is the fastest model measured so far.`);
+    }
+    const byLat = [...lbData.speed].filter(r => r.latency !== undefined).sort((a, b) => a.latency - b.latency);
+    if (byLat.length) {
+        out.push(`<strong>${esc(shortModel(byLat[0].model))}</strong> has the lowest latency at ${fmtNum(byLat[0].latency, 0)} ms.`);
+    }
+    el.innerHTML = out.map(s => `<p class="lb-insight">${s}</p>`).join('');
 }
 
 function barHtml(value, max, fmt) {
@@ -401,13 +442,13 @@ function renderSpeedLb() {
     const maxTps = Math.max(...rows.map(r => r.tps ?? 0), 0);
     tbody.innerHTML = rows.map((r, i) => `<tr>
         <td class="text-muted">${i + 1}</td>
-        <td><strong>${esc(r.model)}</strong></td>
+        <td class="model-cell" style="--ep-color:${epColor(r.endpoint)}"><strong title="${esc(r.model)}">${esc(shortModel(r.model))}</strong><span class="ep-sub">${esc(r.endpoint)}</span></td>
         <td>${esc(r.endpoint)}</td>
         <td class="num"><strong>${r.tps !== undefined ? fmtNum(r.tps) : '-'}</strong>${r.tps !== undefined ? barHtml(r.tps, maxTps, '') : ''}</td>
         <td class="num">${r.latency !== undefined ? fmtNum(r.latency, 0) + ' ms' : '-'}</td>
         <td class="num">${r.ttft !== undefined ? fmtNum(r.ttft, 0) + ' ms' : '-'}</td>
         <td class="num">${r.success !== undefined ? fmtNum(r.success * 100, 0) + '%' : '-'}</td>
-        <td><button class="btn small" onclick="showRunDetail(${r.run_id})">#${r.run_id}</button></td>
+        <td><button class="btn small ghost" onclick="showRunDetail(${r.run_id})">#${r.run_id} →</button></td>
     </tr>`).join('');
 }
 
@@ -426,11 +467,11 @@ function renderQualityLb() {
     }
     tbody.innerHTML = rows.map((r, i) => `<tr>
         <td class="text-muted">${i + 1}</td>
-        <td><strong>${esc(r.model)}</strong></td>
+        <td class="model-cell" style="--ep-color:${epColor(r.endpoint)}"><strong title="${esc(r.model)}">${esc(shortModel(r.model))}</strong><span class="ep-sub">${esc(r.endpoint)}</span></td>
         <td>${esc(r.endpoint)}</td>
         <td><span class="badge">${esc(r.harness)}</span></td>
         <td class="num"><strong>${fmtNum(r.value, 3)}</strong></td>
-        <td><button class="btn small" onclick="showRunDetail(${r.run_id})">#${r.run_id}</button></td>
+        <td><button class="btn small ghost" onclick="showRunDetail(${r.run_id})">#${r.run_id} →</button></td>
     </tr>`).join('');
 }
 

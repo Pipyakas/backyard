@@ -4,116 +4,148 @@
     <meta charset="UTF-8">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>backyard - Local LLM Eval Lab</title>
+    <title>backyard — Local LLM Leaderboard</title>
     <link rel="stylesheet" href="/static/css/style.css?v=20260904a" crossorigin="anonymous">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦙</text></svg>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <header class="header-with-tabs">
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">
+    <div class="container">
+        <div class="aa-nav-wrap">
+            <header class="aa-nav">
+                <a class="aa-brand" href="/">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2L2 7l10 5 10-5-10-5z"/>
                         <path d="M2 17l10 5 10-5"/>
                         <path d="M2 12l10 5 10-5"/>
                     </svg>
-                    <span class="brand">backyard</span>
-                    <span class="subtitle">local LLM eval lab</span>
-                </div>
-
-                <nav class="tabs">
+                    <span class="brand-name">backyard</span>
+                    <span class="local-tag">local</span>
+                </a>
+                <nav class="aa-tabs">
                     <a href="/" class="tab active" data-tab="leaderboard">Leaderboard</a>
                     <a href="/benchmarks" class="tab" data-tab="benchmarks">Speed</a>
                     <a href="/evals" class="tab" data-tab="evals">Quality</a>
                     <a href="/endpoints" class="tab" data-tab="endpoints">Endpoints</a>
                     <a href="/settings" class="tab" data-tab="settings">Settings</a>
                 </nav>
-
-                <button id="admin-status-btn" class="btn small" onclick="window.location.href='/auth'" style="display: none;">Admin</button>
-            </div>
+                <button id="admin-status-btn" class="aa-nav-btn" onclick="window.location.href='/auth'" style="display: none;">Admin</button>
+            </header>
         </div>
-    </header>
+    </div>
 
-    <div class="container main-container">
+    <div class="container">
         <main>
             <!-- ======================= LEADERBOARD ======================= -->
             <section id="leaderboard" class="tab-content active">
                 <div class="lb-hero">
-                    <div>
-                        <h2>Local LLM Leaderboard</h2>
-                        <p class="text-muted">Every model below ran on your own hardware, against your own endpoints. <span id="lb-updated-at"></span></p>
-                    </div>
-                    <button class="btn small secondary" onclick="loadLeaderboard()">Refresh</button>
+                    <h1>Local LLM Leaderboard</h1>
+                    <p class="lede">Comparison of models running on your own hardware, measured against your own inference endpoints — speed, latency, and quality evals, all local.</p>
+                    <div class="lb-insights" id="lb-insights"></div>
+                    <p class="lb-updated" id="lb-updated-at"></p>
                 </div>
 
                 <div class="lb-stats" id="lb-highlights"></div>
 
-                <div class="card">
-                    <div class="section-header">
-                        <h3>Output Speed <span class="text-muted" style="text-transform:none;letter-spacing:0">· tok/s, higher is better</span></h3>
-                    </div>
-                    <div class="lb-filters">
-                        <input type="search" id="lb-search" placeholder="Filter models…" oninput="renderLeaderboardTables()">
-                        <select id="lb-endpoint" onchange="renderLeaderboardTables()">
-                            <option value="">All endpoints</option>
-                        </select>
-                    </div>
-                    <table class="model-table lb-table" id="leaderboard-speed">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th data-sort="model">Model</th>
-                                <th data-sort="endpoint">Endpoint</th>
-                                <th data-sort="tps" class="num sorted-desc">Speed</th>
-                                <th data-sort="latency" class="num">Latency</th>
-                                <th data-sort="ttft" class="num">TTFT</th>
-                                <th data-sort="success" class="num">Success</th>
-                                <th>Run</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                <div class="lb-filters">
+                    <input type="search" id="lb-search" placeholder="Filter, e.g. smollm2, l0" oninput="renderLeaderboardTables()">
+                    <select id="lb-endpoint" onchange="renderLeaderboardTables()">
+                        <option value="">All endpoints</option>
+                    </select>
+                    <select id="lb-harness" onchange="renderLeaderboardTables()">
+                        <option value="">All harnesses</option>
+                    </select>
+                    <button class="pill-toggle on" id="lb-toggle-speed" onclick="toggleLbSection('speed')">Speed</button>
+                    <button class="pill-toggle on" id="lb-toggle-quality" onclick="toggleLbSection('quality')">Quality</button>
+                    <button class="btn small secondary" onclick="loadLeaderboard()">Refresh</button>
                 </div>
 
-                <div class="card">
-                    <div class="section-header">
-                        <h3>Quality <span class="text-muted" style="text-transform:none;letter-spacing:0">· harness scores, higher is better</span></h3>
+                <div id="lb-speed-wrap">
+                    <div class="table-scroll">
+                        <table class="lb-table" id="leaderboard-speed">
+                            <thead>
+                                <tr class="group-row">
+                                    <th colspan="2">Model</th>
+                                    <th colspan="1">Endpoint</th>
+                                    <th colspan="1">Speed</th>
+                                    <th colspan="2">Latency</th>
+                                    <th colspan="1">Reliability</th>
+                                    <th colspan="1"></th>
+                                </tr>
+                                <tr>
+                                    <th>#</th>
+                                    <th class="model-cell" data-sort="model">Model</th>
+                                    <th data-sort="endpoint">Endpoint</th>
+                                    <th data-sort="tps" class="num sorted-desc">tok/s</th>
+                                    <th data-sort="latency" class="num">Latency</th>
+                                    <th data-sort="ttft" class="num">TTFT</th>
+                                    <th data-sort="success" class="num">Success</th>
+                                    <th>Run</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
                     </div>
-                    <div class="lb-filters">
-                        <select id="lb-harness" onchange="renderLeaderboardTables()">
-                            <option value="">All harnesses</option>
-                        </select>
-                    </div>
-                    <table class="model-table lb-table" id="leaderboard-quality">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Model</th>
-                                <th>Endpoint</th>
-                                <th>Harness</th>
-                                <th class="num">Score</th>
-                                <th>Run</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
                 </div>
 
-                <div class="card">
+                <div id="lb-quality-wrap" style="margin-top: 20px;">
+                    <div class="table-scroll">
+                        <table class="lb-table" id="leaderboard-quality">
+                            <thead>
+                                <tr class="group-row">
+                                    <th colspan="2">Model</th>
+                                    <th colspan="1">Endpoint</th>
+                                    <th colspan="2">Quality</th>
+                                    <th colspan="1"></th>
+                                </tr>
+                                <tr>
+                                    <th>#</th>
+                                    <th class="model-cell">Model</th>
+                                    <th>Endpoint</th>
+                                    <th>Harness</th>
+                                    <th class="num">Score</th>
+                                    <th>Run</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="key-defs">
+                    <h2>Key definitions</h2>
+                    <dl>
+                        <dt>tok/s</dt><dd>Median output tokens per second while generating (after first chunk).</dd>
+                        <dt>Latency</dt><dd>Mean end-to-end request time per chat completion.</dd>
+                        <dt>TTFT</dt><dd>Time to first token, measured on streaming requests.</dd>
+                        <dt>Quality score</dt><dd>Harness-specific metric (pass rate, reward, …) — higher is better. Compare within a harness, not across.</dd>
+                    </dl>
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
                     <div class="section-header">
                         <h3>Endpoints</h3>
                         <button class="btn small secondary" onclick="navigateTo('/endpoints')">Manage</button>
                     </div>
                     <div id="leaderboard-endpoints"></div>
                 </div>
+
+                <footer class="aa-footer">
+                    <span>backyard — local benchmark hub. All measurements run on your own hardware.</span>
+                    <span id="lb-footer-updated"></span>
+                </footer>
             </section>
 
             <!-- ======================= SPEED TESTS ======================= -->
             <section id="benchmarks" class="tab-content">
+                <div class="lb-hero">
+                    <h1>Speed tests</h1>
+                    <p class="lede">Measure output speed, latency, and time-to-first-token against any OpenAI-compatible endpoint.</p>
+                </div>
+
                 <div class="card" id="bench-run-form-card" style="display: none;">
-                    <h3>Run Speed Test</h3>
+                    <h3>Run speed test</h3>
+                    <p class="card-sub">Hits <code>/v1/chat/completions</code> on the chosen endpoint. Works with any OpenAI-compatible provider (ccgw, vLLM, llama.cpp, Ollama, OpenAI).</p>
                     <form id="benchmark-form">
                         <div class="form-row">
                             <div class="form-group" style="flex:2">
@@ -146,7 +178,6 @@
                             </div>
                         </div>
                     </form>
-                    <p class="text-muted" style="font-size:0.8rem">Hits <code>/v1/chat/completions</code> on the chosen endpoint. Works with any OpenAI-compatible provider (ccgw, vLLM, llama.cpp, Ollama, OpenAI).</p>
                 </div>
                 <div class="card" id="bench-login-hint" style="display: none;">
                     <p class="empty-state">Log in as admin to run speed tests.</p>
@@ -154,45 +185,52 @@
 
                 <div class="card">
                     <div class="section-header">
-                        <h3>Speed History</h3>
+                        <h3>Speed history</h3>
                         <div class="view-switcher">
                             <select id="speed-history-model" onchange="renderSpeedChart()">
                                 <option value="">All models</option>
                             </select>
                         </div>
                     </div>
-                    <div style="width: 100%; height: 260px;">
+                    <div class="chart-wrap">
                         <canvas id="speed-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="section-header">
-                        <h3>Speed Runs</h3>
+                        <h3>Speed runs</h3>
                         <button class="btn small secondary" onclick="loadBenchHistory()">Refresh</button>
                     </div>
-                    <table class="model-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Model</th>
-                                <th>Endpoint</th>
-                                <th>Status</th>
-                                <th>Speed</th>
-                                <th>Latency</th>
-                                <th>Created</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="bench-history-body"></tbody>
-                    </table>
+                    <div class="table-scroll">
+                        <table class="model-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Model</th>
+                                    <th>Endpoint</th>
+                                    <th>Status</th>
+                                    <th>Speed</th>
+                                    <th>Latency</th>
+                                    <th>Created</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="bench-history-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
             <!-- ======================= QUALITY EVALS ======================= -->
             <section id="evals" class="tab-content">
+                <div class="lb-hero">
+                    <h1>Quality evals</h1>
+                    <p class="lede">Agentic coding, terminal tasks, tool use, and code generation — harnesses run locally against your endpoints.</p>
+                </div>
+
                 <div class="card" id="eval-endpoint-card" style="display: none;">
-                    <h3>Inference Endpoints</h3>
+                    <h3>Inference endpoints</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Name</label>
@@ -218,7 +256,8 @@
                 </div>
 
                 <div class="card" id="eval-run-form-card" style="display: none;">
-                    <h3>Run Quality Eval</h3>
+                    <h3>Run quality eval</h3>
+                    <p class="card-sub"><code>micro_swe</code> = agentic coding with tool calls; <code>tau2</code> = tool-agent customer service tasks.</p>
                     <form id="eval-form">
                         <div class="form-row">
                             <div class="form-group">
@@ -252,10 +291,6 @@
                             </div>
                         </div>
                     </form>
-                    <p class="text-muted" style="font-size: 0.8rem; margin-top: 8px;">
-                        Harnesses run locally on this machine against the chosen inference endpoint.
-                        <code>micro_swe</code> = agentic coding with tool calls; <code>tau2</code> = tool-agent customer service tasks.
-                    </p>
                 </div>
                 <div class="card" id="eval-login-hint" style="display: none;">
                     <p class="empty-state">Log in as admin to run quality evals.</p>
@@ -263,7 +298,7 @@
 
                 <div class="card">
                     <div class="section-header">
-                        <h3>Score Comparison</h3>
+                        <h3>Score comparison</h3>
                         <div class="view-switcher">
                             <select id="eval-chart-task" onchange="renderEvalChart()">
                                 <option value="coding">Coding pass@1</option>
@@ -271,38 +306,46 @@
                             </select>
                         </div>
                     </div>
-                    <div style="width: 100%; height: 300px;">
+                    <div class="chart-wrap tall">
                         <canvas id="eval-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="section-header">
-                        <h3>Quality Runs</h3>
+                        <h3>Quality runs</h3>
                         <button class="btn small secondary" onclick="loadEvalHistory()">Refresh</button>
                     </div>
-                    <table class="model-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Model</th>
-                                <th>Machine</th>
-                                <th>Task</th>
-                                <th>Status</th>
-                                <th>Score</th>
-                                <th>Created</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="eval-history-body"></tbody>
-                    </table>
+                    <div class="table-scroll">
+                        <table class="model-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Model</th>
+                                    <th>Machine</th>
+                                    <th>Task</th>
+                                    <th>Status</th>
+                                    <th>Score</th>
+                                    <th>Created</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="eval-history-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
             <!-- ======================= ENDPOINTS ======================= -->
             <section id="endpoints" class="tab-content">
+                <div class="lb-hero">
+                    <h1>Endpoints</h1>
+                    <p class="lede">Register inference servers once, then benchmark them from the Speed and Quality tabs.</p>
+                </div>
+
                 <div class="card" id="endpoint-add-card" style="display: none;">
-                    <h3>Add Endpoint</h3>
+                    <h3>Add endpoint</h3>
+                    <p class="card-sub">Base URL should be the API root (e.g. <code>https://api.openai.com</code> or <code>http://l0:8000</code>). The app appends <code>/v1/chat/completions</code> automatically.</p>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Name</label>
@@ -337,7 +380,6 @@
                             <button class="btn primary" onclick="addEndpoint()">Add Endpoint</button>
                         </div>
                     </div>
-                    <p class="text-muted" style="font-size:0.8rem">Base URL should be the API root (e.g. <code>https://api.openai.com</code> or <code>http://l0:8000</code>). The app appends <code>/v1/chat/completions</code> automatically.</p>
                     <div id="endpoints-list-2"></div>
                 </div>
                 <div class="card" id="endpoint-login-hint" style="display:none"><p class="empty-state">Log in as admin to manage endpoints.</p></div>
@@ -353,13 +395,17 @@
 
             <!-- ======================= SETTINGS ======================= -->
             <section id="settings" class="tab-content">
+                <div class="lb-hero">
+                    <h1>Settings</h1>
+                </div>
                 <div class="card">
-                    <h3>Admin Access</h3>
+                    <h3>Admin access</h3>
                     <div id="auth-section"></div>
                 </div>
 
                 <div class="card">
                     <h3>Appearance</h3>
+                    <p class="card-sub">Dark is the default; Light matches artificialanalysis.ai verbatim.</p>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Color Theme</label>
