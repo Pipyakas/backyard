@@ -155,6 +155,51 @@ fn newest_job_dir(jobs_dir: &std::path::Path) -> Option<PathBuf> {
     newest.map(|(_, p)| p)
 }
 
+/// Snapshot of job-dir names before a pier/harbor run, so result parsing
+/// only accepts a directory the run itself created (never a stale one).
+fn job_dir_names(jobs_dir: &std::path::Path) -> std::collections::HashSet<String> {
+    std::fs::read_dir(jobs_dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|e| e.path().is_dir())
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Newest job dir not present in `before`. Fails closed: a harness run that
+/// produced no fresh output is an error, not a silent reuse of old results.
+fn fresh_job_dir(jobs_dir: &std::path::Path, before: &std::collections::HashSet<String>) -> Result<PathBuf> {
+    let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+    if let Ok(entries) = std::fs::read_dir(jobs_dir) {
+        for e in entries.flatten() {
+            let p = e.path();
+            if !p.is_dir() {
+                continue;
+            }
+            let name = e.file_name().to_string_lossy().into_owned();
+            if before.contains(&name) {
+                continue;
+            }
+            // A real pier/harbor job dir always contains result.json.
+            if !p.join("result.json").exists() {
+                continue;
+            }
+            if let Ok(meta) = p.metadata() {
+                let t = meta.modified().unwrap_or(std::time::UNIX_EPOCH);
+                if newest.as_ref().map(|(nt, _)| t > *nt).unwrap_or(true) {
+                    newest = Some((t, p));
+                }
+            }
+        }
+    }
+    newest
+        .map(|(_, p)| p)
+        .ok_or_else(|| anyhow::anyhow!("harness produced no fresh job output in {}", jobs_dir.display()))
+}
+
 fn run_deepswe(run: &Run, endpoint: &EvalEndpoint) -> Result<(String, Vec<RunResult>)> {
     let dir = evals_dir()?;
     let jobs_dir = dir.join("jobs");
@@ -255,11 +300,18 @@ fn run_opencode(run: &Run, endpoint: &EvalEndpoint) -> Result<(String, Vec<RunRe
         .and_then(|v| v.as_str())
         .unwrap_or("abs-stepped-slices")
         .to_string();
+    // Absolute task path: pier resolves -p relative to cwd, and the backend
+    // runs from the evals root (not deep-swe/), so a relative tasks/... path
+    // would resolve to the wrong directory and pier would crash at startup.
+    let tasks_root = dir.join("deep-swe");
     let task_path = if task.contains('/') {
         task.clone()
     } else {
-        format!("tasks/{}", task)
+        tasks_root.join("tasks").join(&task).to_string_lossy().into_owned()
     };
+    if !std::path::Path::new(&task_path).exists() {
+        bail!("deep-swe task not found: {}", task_path);
+    }
 
     let key = endpoint.api_key.clone().unwrap_or_default();
     if key.is_empty() {
@@ -286,6 +338,10 @@ fn run_opencode(run: &Run, endpoint: &EvalEndpoint) -> Result<(String, Vec<RunRe
     let ak = format!("opencode_config={}", opencode_config);
     let model_arg = format!("{}/{}", provider, model_id);
 
+    // Snapshot job dirs first: result parsing must only accept output this
+    // run created, never a stale directory from an earlier run.
+    let before = job_dir_names(&jobs_dir);
+
     let args = [
         "run",
         "-p",
@@ -301,11 +357,9 @@ fn run_opencode(run: &Run, endpoint: &EvalEndpoint) -> Result<(String, Vec<RunRe
         "--jobs-dir",
         jobs_dir.to_str().unwrap(),
     ];
-    let out = run_capture(&find_pier(), &args, Some(&tasks_dir))?;
+    let out = run_capture(&find_pier(), &args, Some(&dir))?;
 
-    let Some(dirp) = newest_job_dir(&jobs_dir) else {
-        bail!("no pier job output found in {}", jobs_dir.display());
-    };
+    let dirp = fresh_job_dir(&jobs_dir, &before)?;
     let results_path = dirp.join("result.json");
     let text = std::fs::read_to_string(&results_path)
         .map_err(|e| anyhow::anyhow!("cannot read {}: {}", results_path.display(), e))?;
